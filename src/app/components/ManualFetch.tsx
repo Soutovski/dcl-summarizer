@@ -7,6 +7,7 @@ export default function ManualFetch() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>('');
   const router = useRouter();
 
   const handleFetch = async () => {
@@ -15,8 +16,9 @@ export default function ManualFetch() {
     setSuccess(false);
     
     try {
-      // Calls the same cron route that Vercel uses
-      const response = await fetch('/api/cron/fetch');
+      // Calls the same cron route that Vercel uses, optionally with a date
+      const url = selectedDate ? `/api/cron/fetch?date=${selectedDate}` : '/api/cron/fetch';
+      const response = await fetch(url);
       const data = await response.json();
       
       if (data.success || data.summary) {
@@ -47,16 +49,24 @@ export default function ManualFetch() {
         </p>
       </div>
       
-      <div className="flex flex-col items-end gap-2">
-        <button 
-          onClick={handleFetch}
-          disabled={loading}
-          className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-neutral-950 font-bold py-3 px-6 rounded-full transition-colors whitespace-nowrap"
-        >
-          {loading ? "Buscando e Resumindo..." : "Buscar DCL Mais Recente"}
-        </button>
-        {error && <span className="text-red-400 text-sm font-medium">{error}</span>}
-        {success && <span className="text-emerald-400 text-sm font-medium">Busca finalizada com sucesso!</span>}
+      <div className="flex flex-col sm:flex-row items-center gap-4">
+        <input 
+          type="date" 
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          className="bg-neutral-800 text-neutral-200 border border-neutral-700 rounded-xl px-4 py-3 outline-none focus:border-emerald-500 transition-colors"
+        />
+        <div className="flex flex-col items-end gap-2">
+          <button 
+            onClick={handleFetch}
+            disabled={loading}
+            className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-neutral-950 font-bold py-3 px-6 rounded-full transition-colors whitespace-nowrap"
+          >
+            {loading ? "Buscando e Resumindo..." : "Buscar DCL"}
+          </button>
+          {error && <span className="text-red-400 text-sm font-medium">{error}</span>}
+          {success && <span className="text-emerald-400 text-sm font-medium">Busca finalizada com sucesso!</span>}
+        </div>
       </div>
     </div>
   );

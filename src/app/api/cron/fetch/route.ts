@@ -6,13 +6,15 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const secret = searchParams.get('secret');
 
+  const dateParam = searchParams.get('date'); // format: YYYY-MM-DD
+
   // Basic security for cron (in production use env vars)
   if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const summary = await fetchDailyDCL();
+    const summary = await fetchDailyDCL(dateParam);
     return NextResponse.json({ success: true, summary });
   } catch (error: any) {
     console.error("Cron fetch error:", error);

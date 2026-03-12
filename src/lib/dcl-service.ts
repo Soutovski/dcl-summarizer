@@ -12,8 +12,62 @@ const ai = new GoogleGenAI({
 
 const CLDF_DCL_URL = "https://www.cl.df.gov.br/diario-da-camara-legislativa";
 
-export async function fetchDailyDCL() {
-  console.log("Fetching CLDF DCL Page...");
+export async function fetchDailyDCL(dateParam?: string | null) {
+  let pdfUrl = "";
+  let dclDate = DateTime.now().setZone("America/Sao_Paulo").startOf("day").toJSDate();
+
+  if (dateParam) {
+    console.log(`Fetching historical DCL directly for date: ${dateParam}...`);
+    // dateParam is assumed to be YYYY-MM-DD
+    const parts = dateParam.split('-');
+    if (parts.length === 3) {
+      dclDate = DateTime.fromObject({ year: parseInt(parts[0]), month: parseInt(parts[1]), day: parseInt(parts[2]) }, { zone: "America/Sao_Paulo" }).startOf("day").toJSDate();
+    }
+    
+    // Check if we already have this summary before querying google
+    const existingSummary = await prisma.dailySummary.findUnique({
+      where: { date: dclDate },
+    });
+
+    if (existingSummary) {
+      console.log("Summary for this historical date already exists. Skipping.");
+      return existingSummary;
+    }
+
+    // Prepare search query
+    // Example: "DCL nº * de 10 de março de 2026" ext:pdf site:cl.df.gov.br
+    const months = ['', 'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    const monthName = months[dclDate.getMonth() + 1];
+    const queryDateStr = `${dclDate.getDate()} de ${monthName} de ${dclDate.getFullYear()}`;
+    const query = `"DCL" "${queryDateStr}" ext:pdf site:cl.df.gov.br/documents`;
+
+    console.log("Google Custom Search Query:", query);
+
+    const apiKey = process.env.GOOGLE_API_KEY;
+    const cx = process.env.GOOGLE_CX;
+
+    if (!apiKey || !cx) {
+      throw new Error("GOOGLE_API_KEY and GOOGLE_CX environment variables are required for historical searches.");
+    }
+
+    const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&q=${encodeURIComponent(query)}&num=1`;
+    const searchRes = await fetch(searchUrl);
+    
+    if (!searchRes.ok) {
+       throw new Error(`Google Search API failed: ${searchRes.statusText}`);
+    }
+
+    const searchData = await searchRes.json();
+
+    if (!searchData.items || searchData.items.length === 0) {
+      throw new Error(`No DCL found for date ${queryDateStr} on Google Search.`);
+    }
+
+    pdfUrl = searchData.items[0].link;
+    console.log("Found Historical PDF URL via Google:", pdfUrl);
+
+  } else {
+    console.log("Fetching CLDF DCL Page for the latest release...");
   const response = await fetch(CLDF_DCL_URL, { cache: 'no-store' });
   if (!response.ok) {
     throw new Error(`Failed to fetch CLDF website: ${response.statusText}`);
@@ -37,28 +91,27 @@ export async function fetchDailyDCL() {
 
   console.log("Found PDF URL:", pdfUrl);
 
-  const rowText = vizLink.closest("tr").text().replace(/\s+/g, ' ').trim();
-  console.log("Extracted row text:", rowText);
+    const rowText = vizLink.closest("tr").text().replace(/\s+/g, ' ').trim();
+    console.log("Extracted row text:", rowText);
 
-  // Extract date from text like "DCL nº 046, de 11 de março de 2026.pdf"
-  const dateMatch = rowText.match(/de (\d{1,2}) de (janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro) de (\d{4})/i);
-  
-  let dclDate = DateTime.now().setZone("America/Sao_Paulo").startOf("day").toJSDate();
-  
-  if (dateMatch) {
-    const months: Record<string, number> = {
-      janeiro: 1, fevereiro: 2, 'março': 3, marco: 3, abril: 4, maio: 5, junho: 6,
-      julho: 7, agosto: 8, setembro: 9, outubro: 10, novembro: 11, dezembro: 12
-    };
-    const day = parseInt(dateMatch[1], 10);
-    const month = months[dateMatch[2].toLowerCase()];
-    const year = parseInt(dateMatch[3], 10);
+    // Extract date from text like "DCL nº 046, de 11 de março de 2026.pdf"
+    const dateMatch = rowText.match(/de (\d{1,2}) de (janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro) de (\d{4})/i);
     
-    // Create the date in local timezone
-    dclDate = DateTime.fromObject({ year, month, day }, { zone: "America/Sao_Paulo" }).startOf("day").toJSDate();
-    console.log("Parsed true DCL Date:", dclDate);
-  } else {
-    console.log("Could not parse date from text, defaulting to today.");
+    if (dateMatch) {
+      const monthsMap: Record<string, number> = {
+        janeiro: 1, fevereiro: 2, 'março': 3, marco: 3, abril: 4, maio: 5, junho: 6,
+        julho: 7, agosto: 8, setembro: 9, outubro: 10, novembro: 11, dezembro: 12
+      };
+      const day = parseInt(dateMatch[1], 10);
+      const month = monthsMap[dateMatch[2].toLowerCase()];
+      const year = parseInt(dateMatch[3], 10);
+      
+      // Create the date in local timezone
+      dclDate = DateTime.fromObject({ year, month, day }, { zone: "America/Sao_Paulo" }).startOf("day").toJSDate();
+      console.log("Parsed true DCL Date:", dclDate);
+    } else {
+      console.log("Could not parse date from text, defaulting to today.");
+    }
   }
 
   // Check if we already have this summary
