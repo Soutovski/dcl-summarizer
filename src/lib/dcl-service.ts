@@ -35,10 +35,11 @@ export async function fetchDailyDCL(dateParam?: string | null) {
     }
 
     // Prepare search query
+    // Prepare search query
     // Example: "DCL nº * de 10 de março de 2026" ext:pdf site:cl.df.gov.br
-    const months = ['', 'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-    const monthName = months[dclDate.getMonth() + 1];
-    const queryDateStr = `${dclDate.getDate()} de ${monthName} de ${dclDate.getFullYear()}`;
+    const monthsNameMap = ['', 'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    const monthNameStr = monthsNameMap[dclDate.getMonth() + 1];
+    const queryDateStr = `${dclDate.getDate()} de ${monthNameStr} de ${dclDate.getFullYear()}`;
     const query = `"DCL" "${queryDateStr}" ext:pdf site:cl.df.gov.br/documents`;
 
     console.log("Google Custom Search Query:", query);
@@ -91,11 +92,12 @@ export async function fetchDailyDCL(dateParam?: string | null) {
 
   console.log("Found PDF URL:", pdfUrl);
 
-    const rowText = vizLink.closest("tr").text().replace(/\s+/g, ' ').trim();
-    console.log("Extracted row text:", rowText);
+    // Extract date from the PDF URL itself (CLDF uses divs, not table rows, so closest("tr") returns empty)
+    // URL looks like: DCL+n%C2%BA+047%2C+de+12+de+mar%C3%A7o+de+2026.pdf
+    const decodedUrl = decodeURIComponent(pdfUrl.replace(/\+/g, ' '));
+    console.log("Decoded PDF URL:", decodedUrl);
 
-    // Extract date from text like "DCL nº 046, de 11 de março de 2026.pdf"
-    const dateMatch = rowText.match(/de (\d{1,2}) de (janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro) de (\d{4})/i);
+    const dateMatch = decodedUrl.match(/de (\d{1,2}) de (janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro) de (\d{4})/i);
     
     if (dateMatch) {
       const monthsMap: Record<string, number> = {
@@ -110,7 +112,7 @@ export async function fetchDailyDCL(dateParam?: string | null) {
       dclDate = DateTime.fromObject({ year, month, day }, { zone: "America/Sao_Paulo" }).startOf("day").toJSDate();
       console.log("Parsed true DCL Date:", dclDate);
     } else {
-      console.log("Could not parse date from text, defaulting to today.");
+      console.log("Could not parse date from URL, defaulting to today.");
     }
   }
 
