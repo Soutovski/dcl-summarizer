@@ -37,12 +37,33 @@ export async function fetchDailyDCL() {
 
   console.log("Found PDF URL:", pdfUrl);
 
-  // Use today's date (Brasilia time)
-  const today = DateTime.now().setZone("America/Sao_Paulo").startOf("day").toJSDate();
+  const rowText = vizLink.closest("tr").text().replace(/\s+/g, ' ').trim();
+  console.log("Extracted row text:", rowText);
+
+  // Extract date from text like "DCL nº 046, de 11 de março de 2026.pdf"
+  const dateMatch = rowText.match(/de (\d{1,2}) de (janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro) de (\d{4})/i);
+  
+  let dclDate = DateTime.now().setZone("America/Sao_Paulo").startOf("day").toJSDate();
+  
+  if (dateMatch) {
+    const months: Record<string, number> = {
+      janeiro: 1, fevereiro: 2, 'março': 3, marco: 3, abril: 4, maio: 5, junho: 6,
+      julho: 7, agosto: 8, setembro: 9, outubro: 10, novembro: 11, dezembro: 12
+    };
+    const day = parseInt(dateMatch[1], 10);
+    const month = months[dateMatch[2].toLowerCase()];
+    const year = parseInt(dateMatch[3], 10);
+    
+    // Create the date in local timezone
+    dclDate = DateTime.fromObject({ year, month, day }, { zone: "America/Sao_Paulo" }).startOf("day").toJSDate();
+    console.log("Parsed true DCL Date:", dclDate);
+  } else {
+    console.log("Could not parse date from text, defaulting to today.");
+  }
 
   // Check if we already have this summary
   const existingSummary = await prisma.dailySummary.findUnique({
-    where: { date: today },
+    where: { date: dclDate },
   });
 
   if (existingSummary) {
@@ -105,7 +126,7 @@ ${rawText}`
 
   const savedRecord = await prisma.dailySummary.create({
     data: {
-      date: today,
+      date: dclDate,
       pdfUrl,
       rawText,
       summary,

@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import ReactMarkdown from 'react-markdown';
 import { DateTime } from 'luxon';
+import ManualFetch from './components/ManualFetch';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +24,8 @@ export default async function Home() {
             Inteligência Artificial decifrando o Diário da Câmara Legislativa do Distrito Federal para você, todos os dias.
           </p>
         </header>
+
+        <ManualFetch />
 
         {summaries.length === 0 ? (
           <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-8 text-center">
