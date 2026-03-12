@@ -44,11 +44,11 @@ export async function fetchDailyDCL(dateParam?: string | null) {
 
     console.log("Google Custom Search Query:", query);
 
-    const apiKey = process.env.GOOGLE_API_KEY;
+    const apiKey = process.env.GOOGLE_SEARCH_API_KEY;
     const cx = process.env.GOOGLE_CX;
 
     if (!apiKey || !cx) {
-      throw new Error("GOOGLE_API_KEY and GOOGLE_CX environment variables are required for historical searches.");
+      throw new Error("GOOGLE_SEARCH_API_KEY and GOOGLE_CX environment variables are required for historical searches.");
     }
 
     const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&q=${encodeURIComponent(query)}&num=1`;
