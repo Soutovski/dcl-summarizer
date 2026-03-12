@@ -79,7 +79,7 @@ export async function fetchDailyDCL(dateParam?: string | null) {
 
   // Find the exact 'Visualizar' link
   const vizLink = $("a").filter((i, el) => $(el).text().trim() === "Visualizar").first();
-  let pdfUrl = vizLink.attr("href");
+  pdfUrl = vizLink.attr("href") || "";
 
   if (!pdfUrl) {
     throw new Error("Could not extract PDF URL from the page.");
