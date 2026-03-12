@@ -34,38 +34,34 @@ export async function fetchDailyDCL(dateParam?: string | null) {
       return existingSummary;
     }
 
-    // Prepare search query
-    // Prepare search query
-    // Example: "DCL nº * de 10 de março de 2026" ext:pdf site:cl.df.gov.br
+    // Use Gemini with Google Search grounding to find the historical DCL PDF URL
+    // This avoids needing a separate Google Custom Search API key
     const monthsNameMap = ['', 'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
     const monthNameStr = monthsNameMap[dclDate.getMonth() + 1];
     const queryDateStr = `${dclDate.getDate()} de ${monthNameStr} de ${dclDate.getFullYear()}`;
-    const query = `"DCL" "${queryDateStr}" ext:pdf site:cl.df.gov.br/documents`;
 
-    console.log("Google Custom Search Query:", query);
+    console.log("Searching for historical DCL via Gemini Search Grounding:", queryDateStr);
 
-    const apiKey = process.env.GOOGLE_SEARCH_API_KEY;
-    const cx = process.env.GOOGLE_CX;
+    const searchResult = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: `Encontre a URL direta do PDF do "Diário da Câmara Legislativa" (DCL) de ${queryDateStr} no site cl.df.gov.br. 
+A URL segue o padrão: https://www.cl.df.gov.br/documents/5744638/NUMERO/DCL+nº+NNN,+de+DD+de+MES+de+AAAA.pdf/UUID
+Retorne APENAS a URL completa do PDF, sem nenhum texto adicional, explicação ou formatação markdown.`,
+      config: {
+        tools: [{ googleSearch: {} }],
+      }
+    });
 
-    if (!apiKey || !cx) {
-      throw new Error("GOOGLE_SEARCH_API_KEY and GOOGLE_CX environment variables are required for historical searches.");
+    const foundUrl = searchResult.text?.trim() || "";
+    console.log("Gemini Search result:", foundUrl);
+
+    // Validate response looks like a URL
+    if (!foundUrl.startsWith("http")) {
+      throw new Error(`Não foi possível encontrar o DCL de ${queryDateStr}. Resposta: ${foundUrl.substring(0, 100)}`);
     }
 
-    const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&q=${encodeURIComponent(query)}&num=1`;
-    const searchRes = await fetch(searchUrl);
-    
-    if (!searchRes.ok) {
-       throw new Error(`Google Search API failed: ${searchRes.statusText}`);
-    }
-
-    const searchData = await searchRes.json();
-
-    if (!searchData.items || searchData.items.length === 0) {
-      throw new Error(`No DCL found for date ${queryDateStr} on Google Search.`);
-    }
-
-    pdfUrl = searchData.items[0].link;
-    console.log("Found Historical PDF URL via Google:", pdfUrl);
+    pdfUrl = foundUrl;
+    console.log("Found Historical PDF URL via Gemini Search:", pdfUrl);
 
   } else {
     console.log("Fetching CLDF DCL Page for the latest release...");
@@ -154,17 +150,11 @@ export async function fetchDailyDCL(dateParam?: string | null) {
   }
 
   console.log("Got PDF text. Length:", rawText.length);
-  
-  // Truncate to stay within Gemini free tier token limits (250K tokens/min ≈ 200K chars)
-  const MAX_TEXT_LENGTH = 200000;
-  const textForSummary = rawText.length > MAX_TEXT_LENGTH 
-    ? rawText.substring(0, MAX_TEXT_LENGTH) + "\n\n[TEXTO TRUNCADO PARA RESPEITAR LIMITE DE TOKENS]"
-    : rawText;
-  console.log("Text length for summary:", textForSummary.length);
 
+  // Summarize using Gemini
   console.log("Summarizing with Gemini AI...");
   const summaryResult = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     contents: `Você é um assessor legislativo especialista. O texto abaixo é o extrato cru do Diário da Câmara Legislativa do Distrito Federal (DCL). 
 Por favor, analise a publicação do DCL de hoje e faça um resumo executivo abrangente em português. 
 
@@ -177,7 +167,7 @@ O resumo deve:
 6. Não usar jargão excessivamente denso, facilitando o entendimento.
 
 Texto do DCL:
-${textForSummary}`
+${rawText}`
   });
 
   const summary = summaryResult.text || "Não foi possível gerar um resumo claro.";
