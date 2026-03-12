@@ -1,10 +1,1 @@
-import { defineConfig } from '@prisma/config'
-
-export default defineConfig({
-  studio: {
-    port: 5555,
-  },
-  datasource: {
-    url: 'file:./dev.db',
-  },
-})
+  // Configuração removida pois estava quebrando no setup default pós GA.
