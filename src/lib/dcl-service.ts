@@ -155,11 +155,16 @@ export async function fetchDailyDCL(dateParam?: string | null) {
 
   console.log("Got PDF text. Length:", rawText.length);
   
-  // Truncate to avoid huge limits if needed (Gemini Flash has 1M context so we're fine usually)
-  // Let's summarize using Gemini
+  // Truncate to stay within Gemini free tier token limits (250K tokens/min ≈ 200K chars)
+  const MAX_TEXT_LENGTH = 200000;
+  const textForSummary = rawText.length > MAX_TEXT_LENGTH 
+    ? rawText.substring(0, MAX_TEXT_LENGTH) + "\n\n[TEXTO TRUNCADO PARA RESPEITAR LIMITE DE TOKENS]"
+    : rawText;
+  console.log("Text length for summary:", textForSummary.length);
+
   console.log("Summarizing with Gemini AI...");
   const summaryResult = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-2.0-flash',
     contents: `Você é um assessor legislativo especialista. O texto abaixo é o extrato cru do Diário da Câmara Legislativa do Distrito Federal (DCL). 
 Por favor, analise a publicação do DCL de hoje e faça um resumo executivo abrangente em português. 
 
@@ -172,7 +177,7 @@ O resumo deve:
 6. Não usar jargão excessivamente denso, facilitando o entendimento.
 
 Texto do DCL:
-${rawText}`
+${textForSummary}`
   });
 
   const summary = summaryResult.text || "Não foi possível gerar um resumo claro.";
